@@ -34,3 +34,6 @@ go.work.sum
 
 # macOSq
 *.DS_Store
+# Tool output
+/fontbook.pdf
+/font-automation-tool
