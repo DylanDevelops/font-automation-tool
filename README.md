@@ -1,5 +1,5 @@
 # font-automation-tool
-A very simple go command line tool made for Allie.
+A very simple go command line tool made for Allie! :)
 
 It builds a PDF "font book" with one specimen page per font: the font's name, a
 pangram, and the alphabet and numerals, all set in that font. It includes every
