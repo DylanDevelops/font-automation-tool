@@ -1,9 +1,10 @@
 # font-automation-tool
 A very simple go command line tool made for Allie! :)
 
-It builds a PDF "font book" with one specimen page per font: the font's name, a
-pangram, and the alphabet and numerals, all set in that font. It includes every
-font installed on the Mac **plus** the fonts that only Adobe apps can see:
+It builds a PDF "font book" with one US Letter specimen page per font: a large
+"Aa" beside the font's name, then the uppercase and lowercase alphabets, numerals
+and common punctuation, all set in that font. It includes every font installed
+on the Mac **plus** the fonts that only Adobe apps can see:
 
 - **Installed fonts:** `~/Library/Fonts`, `/Library/Fonts`, `/System/Library/Fonts`
 - **Adobe Fonts** activated through Creative Cloud. These are synced as hidden

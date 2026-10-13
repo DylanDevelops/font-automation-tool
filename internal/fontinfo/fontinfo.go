@@ -50,8 +50,10 @@ func (f Face) Key() string {
 	return f.FullName
 }
 
-// LatinSample holds every character the specimen page prints.
-const LatinSample = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz123456789"
+// LatinSample holds the letters and digits a face needs for the standard
+// specimen page. The page also prints some punctuation, but a font missing a
+// symbol or two still gets the standard page.
+const LatinSample = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 
 // Load returns every readable face in the font file at path, and an error
 // describing any faces that could not be read.
@@ -86,7 +88,11 @@ func describe(sfnt *font.SFNT, path string, index int, source string) Face {
 	}
 	// Family + style matches how font menus present the face; name ID 4 is
 	// only a fallback because some fonts store the PostScript name there.
+	// "Regular" is left off, as in the reference specimen ("Myriad Pro").
 	f.FullName = strings.TrimSpace(f.Family + " " + f.Style)
+	if strings.EqualFold(f.Style, "Regular") {
+		f.FullName = f.Family
+	}
 	if f.Family == "" {
 		f.FullName = name(sfnt, 4)
 	}
