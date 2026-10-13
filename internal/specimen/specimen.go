@@ -17,21 +17,20 @@ import (
 	"github.com/DylanDevelops/font-automation-tool/internal/fontinfo"
 )
 
-// Page geometry in points (1/72 in), taken from the reference specimen: a
-// US Letter Illustrator artboard. Y values are baselines measured up from
-// the bottom of the page, as in the PDF itself.
+// Page layout in points, on US Letter. Y values are baselines measured up
+// from the bottom of the page.
 const (
 	pageW = 612.0
 	pageH = 792.0
 
-	marginX  = 27.0 // the rule runs from marginX to pageW-marginX
+	marginX  = 27.0
 	contentW = pageW - 2*marginX
 
-	headerX        = 77.0  // left edge of the large "Aa"
-	headerBaseline = 618.0 // shared by "Aa" and the bottom line of the name
+	headerX        = 77.0
+	headerBaseline = 618.0 // also the baseline of the name's last line
 	headerMaxPt    = 200.0
-	headerMaxW     = 300.0 // "Aa" shrinks for very wide fonts so the name keeps room
-	nameGap        = 36.0  // space between "Aa" and the name
+	headerMaxW     = 300.0 // leaves room for the name on very wide fonts
+	nameGap        = 36.0
 	nameMaxPt      = 36.0
 	nameMinPt      = 14.0
 	nameMaxLines   = 3
@@ -39,14 +38,13 @@ const (
 	ruleY     = 589.0
 	ruleWidth = 2.0
 
-	noteBaseline = 567.0 // explains pages that show a font's own characters
+	noteBaseline = 567.0
 	notePt       = 11.0
 )
 
 const mmPerPt = 25.4 / 72 // canvas works in millimetres
 
-// block is a pair of centered lines set at one size: the largest size up to
-// maxPt at which both fit between the margins.
+// block is a pair of centered lines drawn at the same size.
 type block struct {
 	lines     [2]string
 	baselines [2]float64
@@ -68,7 +66,6 @@ type Skip struct {
 	Reason string
 }
 
-// Result summarises a Write call.
 type Result struct {
 	Pages   int
 	Skipped []Skip
@@ -76,16 +73,13 @@ type Result struct {
 
 // Progress receives status updates from Write.
 type Progress interface {
-	// Face is called after each face is rendered or skipped. skipReason is
-	// empty when the face got a page.
+	// Face is called after each face; skipReason is empty if it was rendered.
 	Face(done, total int, f fontinfo.Face, skipReason string)
-	// Finishing is called once every page is laid out, before fonts are
-	// subset and embedded and the PDF is written out.
+	// Finishing is called before fonts are embedded and the PDF is written.
 	Finishing(pages int)
 }
 
-// Write renders a page for each face to w, reporting to progress if it is
-// non-nil.
+// Write renders a page for each face to w. progress may be nil.
 func Write(w io.Writer, faces []fontinfo.Face, progress Progress) (Result, error) {
 	var res Result
 	fallback, err := canvas.LoadFont(goregular.TTF, 0, canvas.FontRegular)
@@ -93,8 +87,7 @@ func Write(w io.Writer, faces []fontinfo.Face, progress Progress) (Result, error
 		return res, err
 	}
 
-	// Font files are cached because collections hold many faces, and the PDF
-	// writer keeps every font alive until Close anyway.
+	// Collections hold many faces, so each file is read only once.
 	files := map[string][]byte{}
 	var doc *pdf.PDF
 	for i, f := range faces {
@@ -118,8 +111,7 @@ func Write(w io.Writer, faces []fontinfo.Face, progress Progress) (Result, error
 	return res, doc.Close()
 }
 
-// renderFace adds a page for f to *doc, creating the document on the first
-// successful page. It returns why the face was skipped, if it was.
+// renderFace adds a page for f, creating the document on the first success.
 func renderFace(doc **pdf.PDF, w io.Writer, f fontinfo.Face, files map[string][]byte, fallback *canvas.Font) error {
 	if !f.Embeddable {
 		return errors.New("license does not allow embedding")
@@ -150,9 +142,8 @@ func renderFace(doc **pdf.PDF, w io.Writer, f fontinfo.Face, files map[string][]
 	return nil
 }
 
-// buildPage lays out one specimen on its own canvas so that a font that
-// panics inside the shaper or subsetter can be skipped without leaving a
-// half-drawn page in the PDF.
+// buildPage lays out a page on its own canvas so a font that panics while
+// rendering can be skipped without leaving a partial page in the PDF.
 func buildPage(f fontinfo.Face, data []byte, fallback *canvas.Font) (c *canvas.Canvas, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -175,15 +166,14 @@ func buildPage(f fontinfo.Face, data []byte, fallback *canvas.Font) (c *canvas.C
 	if len(f.MissingLatin) == 0 {
 		nameFont := fnt
 		if f.Symbol {
-			nameFont = fallback // a name spelled in pictures is not much use
+			nameFont = fallback
 		}
 		p.header(fnt, "Aa", nameFont, f.FullName)
 		for i, lines := range latinLines {
 			p.block(fnt, block{lines, blockBaselines[i], blockMaxPt[i]})
 		}
 	} else {
-		// Non-Latin fonts: name in a neutral font, then characters the font
-		// actually has instead of a page of .notdef boxes.
+		// Fonts without Latin glyphs show a sample of their own characters.
 		own := fontinfo.OwnCharacters(fnt.SFNT, 56)
 		if len(own) < 2 {
 			return nil, errors.New("font has no mapped characters")
@@ -221,15 +211,15 @@ func buildPage(f fontinfo.Face, data []byte, fallback *canvas.Font) (c *canvas.C
 	return c, nil
 }
 
-// page draws onto one specimen page, working in points, and records which
-// glyphs of the specimen font were used.
+// page draws in points and records which glyphs of font were used, so
+// checkSubset can test them.
 type page struct {
 	ctx  *canvas.Context
 	font *canvas.Font
 	used []uint16
 }
 
-// text draws s with its left edge at x and its baseline at y.
+// text draws s with its left edge at x and baseline at y.
 func (p *page) text(font *canvas.Font, s string, size, x, y float64) {
 	face := font.Face(size, canvas.Black)
 	p.ctx.DrawText(x*mmPerPt, y*mmPerPt, canvas.NewTextLine(face, s, canvas.Left))
@@ -240,14 +230,12 @@ func (p *page) text(font *canvas.Font, s string, size, x, y float64) {
 	}
 }
 
-// centered draws s centered on the page with its baseline at y.
 func (p *page) centered(font *canvas.Font, s string, size, y float64) {
 	p.text(font, s, size, (pageW-textWidth(font, s, size))/2, y)
 }
 
-// header draws the large sample (normally "Aa") and, beside it, the font
-// name. Long names wrap upward from the shared baseline and shrink if three
-// lines are not enough.
+// header draws the large sample ("Aa") beside the font name. Long names
+// wrap upward from the shared baseline, then shrink.
 func (p *page) header(font *canvas.Font, sample string, nameFont *canvas.Font, name string) {
 	size := fitSize(font, sample, headerMaxPt, headerMaxW)
 	p.text(font, sample, size, headerX, headerBaseline)
@@ -263,11 +251,9 @@ func (p *page) header(font *canvas.Font, sample string, nameFont *canvas.Font, n
 			return
 		}
 	}
-	// Still too long: one line, as large as fits.
 	p.text(nameFont, name, fitSize(nameFont, name, nameMinPt, avail), x, headerBaseline)
 }
 
-// block draws a pair of centered lines at a shared size.
 func (p *page) block(font *canvas.Font, b block) {
 	size := b.maxPt
 	for _, line := range b.lines {
@@ -282,13 +268,12 @@ func (p *page) block(font *canvas.Font, b block) {
 	}
 }
 
-// textWidth returns the advance width of s in points.
+// textWidth returns the width of s in points.
 func textWidth(font *canvas.Font, s string, size float64) float64 {
 	return font.Face(size, canvas.Black).TextWidth(s) / mmPerPt
 }
 
-// fitSize returns the largest point size up to maxPt at which s is no wider
-// than width points.
+// fitSize returns the largest size up to maxPt at which s fits in width.
 func fitSize(font *canvas.Font, s string, maxPt, width float64) float64 {
 	const probe = 100.0
 	w := textWidth(font, s, probe)
@@ -298,8 +283,8 @@ func fitSize(font *canvas.Font, s string, maxPt, width float64) float64 {
 	return math.Min(maxPt, probe*width/w)
 }
 
-// wrap breaks s at spaces into lines no wider than width points. ok is
-// false if a single word is wider than width.
+// wrap breaks s into lines no wider than width. ok is false if a single
+// word does not fit.
 func wrap(font *canvas.Font, s string, size, width float64) (lines []string, ok bool) {
 	for _, word := range strings.Fields(s) {
 		if n := len(lines); n > 0 && textWidth(font, lines[n-1]+" "+word, size) <= width {
@@ -329,7 +314,7 @@ func checkSubset(sfnt *tfont.SFNT, glyphIDs []uint16) (err error) {
 		}
 	}
 	if sfnt.IsCFF && sfnt.CFF != nil {
-		sfnt.CFF.SetGlyphNames(nil) // mirrors what the PDF writer does
+		sfnt.CFF.SetGlyphNames(nil) // the PDF writer does this before subsetting
 	}
 	sub, err := sfnt.Subset(ids, tfont.SubsetOptions{Tables: tfont.KeepPDFTables})
 	if err != nil {
@@ -339,8 +324,6 @@ func checkSubset(sfnt *tfont.SFNT, glyphIDs []uint16) (err error) {
 	return nil
 }
 
-// chunk splits runes into consecutive groups of the given sizes, dropping
-// empty groups at the end.
 func chunk(runes []rune, sizes ...int) [][]rune {
 	var out [][]rune
 	for _, n := range sizes {

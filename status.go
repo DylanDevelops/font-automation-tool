@@ -7,12 +7,11 @@ import (
 	"time"
 )
 
-// status prints progress to stderr. On a terminal, Update redraws a single
-// line in place; when stderr is redirected, only permanent lines are
-// printed so logs stay readable.
+// status prints progress to stderr. On a terminal, Update redraws one line in
+// place; when stderr is redirected, only Line output is printed.
 type status struct {
 	tty     bool
-	pending bool // an Update line is on screen and must be cleared first
+	pending bool // an Update line is on screen
 	start   time.Time
 }
 
@@ -24,21 +23,18 @@ func newStatus() *status {
 	}
 }
 
-// Line prints a permanent line.
 func (s *status) Line(format string, args ...any) {
 	s.clear()
 	fmt.Fprintf(os.Stderr, format+"\n", args...)
 }
 
-// Update replaces the transient status line. It does nothing when stderr is
-// not a terminal.
 func (s *status) Update(format string, args ...any) {
 	if !s.tty {
 		return
 	}
 	line := fmt.Sprintf(format, args...)
 	if r := []rune(line); len(r) > 100 {
-		line = string(r[:99]) + "…" // keep it on one line in narrow terminals
+		line = string(r[:99]) + "…"
 	}
 	fmt.Fprint(os.Stderr, "\r\033[K"+line)
 	s.pending = true
@@ -51,12 +47,10 @@ func (s *status) clear() {
 	}
 }
 
-// Elapsed returns the time since the status was created, rounded for display.
 func (s *status) Elapsed() time.Duration {
 	return time.Since(s.start).Round(100 * time.Millisecond)
 }
 
-// bar renders a fixed-width progress bar with a count and percentage.
 func bar(done, total int) string {
 	const width = 24
 	if total <= 0 {
@@ -68,7 +62,6 @@ func bar(done, total int) string {
 		done, total, 100*done/total)
 }
 
-// truncate shortens s to at most n runes.
 func truncate(s string, n int) string {
 	if r := []rune(s); len(r) > n {
 		return string(r[:n-1]) + "…"
@@ -76,7 +69,6 @@ func truncate(s string, n int) string {
 	return s
 }
 
-// humanSize formats a byte count as KB/MB.
 func humanSize(n int64) string {
 	switch {
 	case n >= 1<<20:

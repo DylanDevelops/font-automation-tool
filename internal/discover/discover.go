@@ -1,5 +1,5 @@
-// Package discover finds font files on disk, including the ones Adobe apps
-// see but the operating system does not list.
+// Package discover finds font files on disk, including fonts only Adobe apps
+// can see.
 package discover
 
 import (
@@ -18,18 +18,17 @@ type Source struct {
 	Dirs []string
 }
 
-// File is a font file found on disk and the source it came from.
 type File struct {
 	Path   string
 	Source string
 }
 
-// Source names, in the order they are scanned. When the same font exists in
-// more than one source, the earlier source wins.
+// Source names, in the order they are scanned. When a font exists in more
+// than one source, the earlier source wins.
 const (
-	Installed  = "installed"   // fonts installed in the OS
-	AdobeFonts = "adobe-fonts" // fonts activated through Adobe Fonts (Creative Cloud)
-	AdobeApps  = "adobe-apps"  // fonts bundled inside Adobe app packages
+	Installed  = "installed"
+	AdobeFonts = "adobe-fonts" // activated through Creative Cloud
+	AdobeApps  = "adobe-apps"  // bundled inside Adobe apps
 )
 
 var fontExts = map[string]bool{".otf": true, ".ttf": true, ".ttc": true, ".otc": true}
@@ -44,8 +43,8 @@ func DefaultSources() ([]Source, error) {
 		return nil, err
 	}
 
-	// Adobe app bundles carry private fonts (e.g. Myriad, Minion, Acumin
-	// variable concepts) that only show up in Adobe font menus.
+	// Fonts bundled in Adobe apps (e.g. Myriad Pro) only appear in Adobe
+	// font menus.
 	appFonts, _ := filepath.Glob("/Applications/Adobe */*.app/Contents/Required/Fonts")
 	sort.Sort(sort.Reverse(sort.StringSlice(appFonts))) // newest app version first
 
@@ -55,8 +54,8 @@ func DefaultSources() ([]Source, error) {
 			"/Library/Fonts",
 			"/System/Library/Fonts",
 		}},
-		// Creative Cloud syncs activated Adobe Fonts here as hidden files with
-		// numeric names (e.g. .w/.1344.otf). They are plain OpenType fonts.
+		// Creative Cloud syncs activated Adobe Fonts here as hidden OpenType
+		// files with numeric names, e.g. .w/.1344.otf.
 		{Name: AdobeFonts, Dirs: []string{
 			filepath.Join(home, "Library/Application Support/Adobe/CoreSync/plugins/livetype"),
 		}},
@@ -64,8 +63,8 @@ func DefaultSources() ([]Source, error) {
 	}, nil
 }
 
-// Find walks every directory in sources and returns the font files it finds.
-// Missing directories are skipped silently.
+// Find returns the font files in every directory of sources. Missing
+// directories are skipped.
 func Find(sources []Source) []File {
 	var files []File
 	seen := map[string]bool{}

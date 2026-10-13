@@ -127,8 +127,8 @@ func run(out, sourceList, match string, limit int, list, verbose bool) error {
 	return nil
 }
 
-// renderProgress shows rendering progress on the status line and, with -v,
-// prints each skipped font as it happens.
+// renderProgress updates the status line; with -v it also prints each
+// skipped font.
 type renderProgress struct {
 	st      *status
 	verbose bool
@@ -155,7 +155,7 @@ func (p *renderProgress) Finishing(pages int) {
 }
 
 // loadFaces reads every file, drops hidden system faces and duplicates (the
-// earliest source wins), and sorts the result by name.
+// earliest source wins) and sorts by name.
 func loadFaces(files []discover.File, st *status) ([]fontinfo.Face, []string) {
 	var faces []fontinfo.Face
 	var unreadable []string

@@ -10,17 +10,16 @@ import (
 	"github.com/tdewolff/font"
 )
 
-// Extract returns one face of a font file as a standalone font, together
-// with its parsed form.
+// Extract returns one face of a font file as a standalone font, along with
+// its parsed form.
 //
-// Faces are rebuilt from their table directory rather than handed to the
-// parser as-is because tdewolff/font rejects the last face of every
-// collection, and because it is strict about a few tables that many shipping
-// macOS fonts get slightly wrong. When parsing fails on one of those tables,
-// the table is repaired or dropped and parsing is retried:
+// tdewolff/font rejects the last face of every collection and is strict
+// about tables that many macOS fonts get slightly wrong, so faces are
+// rebuilt from their table directory. When parsing fails on one of these
+// tables, it is repaired and parsing is retried:
 //
-//   - kern: dropped (GPOS kerning, when present, is unaffected)
-//   - post: reduced to a version 3 header, which carries no glyph names
+//   - kern: dropped (GPOS kerning is unaffected)
+//   - post: reduced to a version 3 header, which has no glyph names
 //   - cmap: reduced to its Unicode subtables, then to format 12 only
 //   - head: out-of-range created/modified dates are zeroed
 func Extract(b []byte, index int) ([]byte, *font.SFNT, error) {
@@ -63,8 +62,8 @@ func Extract(b []byte, index int) ([]byte, *font.SFNT, error) {
 	}
 }
 
-// readTables returns the sfnt version and tables of face index in b, which
-// may be a single font or a collection.
+// readTables returns the sfnt version and tables of one face in b, which may
+// be a single font or a collection.
 func readTables(b []byte, index int) (string, map[string][]byte, error) {
 	errBad := errors.New("invalid font data")
 	offset := 0
@@ -99,7 +98,7 @@ func readTables(b []byte, index int) (string, map[string][]byte, error) {
 	return version, tables, nil
 }
 
-// writeSFNT serialises tables as a single (non-collection) font.
+// writeSFNT writes tables out as a standalone font file.
 func writeSFNT(version string, tables map[string][]byte) []byte {
 	tags := make([]string, 0, len(tables))
 	size := 12 + 16*len(tables)
@@ -160,7 +159,7 @@ func isUnicodeEncoding(platform, encoding, _ uint16) bool {
 }
 
 // filterCmap rebuilds a cmap table with only the encoding records keep
-// accepts. Subtables shared by several records are written once.
+// accepts.
 func filterCmap(cmap []byte, keep func(platform, encoding, format uint16) bool) ([]byte, error) {
 	errBad := errors.New("cmap: bad table")
 	if len(cmap) < 4 {
@@ -215,7 +214,6 @@ func filterCmap(cmap []byte, keep func(platform, encoding, format uint16) bool) 
 	return out, nil
 }
 
-// cmapSubtable returns the bytes and format of the subtable at offset.
 func cmapSubtable(cmap []byte, offset uint32) ([]byte, uint16, error) {
 	errBad := errors.New("cmap: bad subtable")
 	if uint64(len(cmap)) < uint64(offset)+8 {

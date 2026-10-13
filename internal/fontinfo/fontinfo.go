@@ -20,20 +20,13 @@ type Face struct {
 	Source     string
 	Family     string
 	Style      string
-	FullName   string // family + style, used as the page label
+	FullName   string // page label
 	PostScript string
 
-	// Embeddable is false when the font's license forbids embedding it in a
-	// document (OS/2 fsType restricted or bitmap-only).
-	Embeddable bool
-	// MissingLatin lists the specimen characters the font has no glyph for.
-	MissingLatin []rune
-	// Symbol is true for fonts with a Windows symbol cmap (Webdings,
-	// Wingdings, ...), whose Latin code points map to pictures.
-	Symbol bool
-	// ColorBitmap is true for fonts whose glyphs are color bitmaps (emoji)
-	// rather than outlines.
-	ColorBitmap bool
+	Embeddable   bool   // false if the font's license forbids embedding
+	MissingLatin []rune // characters of LatinSample the font has no glyph for
+	Symbol       bool   // maps Latin characters to pictures, like Webdings
+	ColorBitmap  bool   // emoji font whose glyphs are bitmaps, not outlines
 }
 
 // Hidden reports whether the face is a private system UI font (".SF NS",
@@ -42,7 +35,7 @@ func (f Face) Hidden() bool {
 	return strings.HasPrefix(f.Family, ".") || strings.HasPrefix(f.PostScript, ".") || f.Family == "LastResort"
 }
 
-// Key identifies the face for de-duplication across sources.
+// Key identifies the face when removing duplicates across sources.
 func (f Face) Key() string {
 	if f.PostScript != "" {
 		return f.PostScript
@@ -50,9 +43,8 @@ func (f Face) Key() string {
 	return f.FullName
 }
 
-// LatinSample holds the letters and digits a face needs for the standard
-// specimen page. The page also prints some punctuation, but a font missing a
-// symbol or two still gets the standard page.
+// LatinSample is what a face needs for the standard specimen page.
+// Punctuation is printed too but not required.
 const LatinSample = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 
 // Load returns every readable face in the font file at path, and an error
@@ -86,9 +78,8 @@ func describe(sfnt *font.SFNT, path string, index int, source string) Face {
 		PostScript: name(sfnt, 6),
 		Embeddable: true,
 	}
-	// Family + style matches how font menus present the face; name ID 4 is
-	// only a fallback because some fonts store the PostScript name there.
-	// "Regular" is left off, as in the reference specimen ("Myriad Pro").
+	// Name ID 4 (full name) is only a fallback: some fonts store their
+	// PostScript name there.
 	f.FullName = strings.TrimSpace(f.Family + " " + f.Style)
 	if strings.EqualFold(f.Style, "Regular") {
 		f.FullName = f.Family
@@ -97,7 +88,7 @@ func describe(sfnt *font.SFNT, path string, index int, source string) Face {
 		f.FullName = name(sfnt, 4)
 	}
 	if sfnt.OS2 != nil {
-		fsType := sfnt.OS2.FsType
+		fsType := sfnt.OS2.FsType // restricted-license or bitmap-only embedding
 		if fsType&0x000F == 0x0002 || fsType&0x0200 != 0 {
 			f.Embeddable = false
 		}
@@ -109,7 +100,7 @@ func describe(sfnt *font.SFNT, path string, index int, source string) Face {
 	}
 	if sfnt.Cmap != nil {
 		for _, rec := range sfnt.Cmap.EncodingRecords {
-			if rec.PlatformID == 3 && rec.EncodingID == 0 {
+			if rec.PlatformID == 3 && rec.EncodingID == 0 { // Windows symbol encoding
 				f.Symbol = true
 			}
 		}
@@ -122,9 +113,8 @@ func describe(sfnt *font.SFNT, path string, index int, source string) Face {
 	return f
 }
 
-// OwnCharacters returns up to n standalone characters the font does have,
-// for faces that cannot show the Latin specimen (non-Latin fonts). Combining
-// marks are left out because they only make sense attached to a base letter.
+// OwnCharacters returns up to n characters the font has glyphs for, leaving
+// out combining marks, which only make sense attached to a letter.
 func OwnCharacters(sfnt *font.SFNT, n int) []rune {
 	seen := map[rune]bool{}
 	var runes []rune
@@ -144,8 +134,6 @@ func OwnCharacters(sfnt *font.SFNT, n int) []rune {
 	return runes
 }
 
-// numFaces returns the number of faces in a font file: the count from the
-// header for collections, 1 otherwise.
 func numFaces(b []byte) int {
 	if len(b) >= 12 && string(b[:4]) == "ttcf" {
 		return int(binary.BigEndian.Uint32(b[8:12]))
@@ -171,7 +159,7 @@ func name(sfnt *font.SFNT, ids ...font.NameID) string {
 			case rec.Platform == font.PlatformMacintosh && rec.Encoding == font.EncodingMacintoshRoman && rec.Language == 0:
 				rank = 2
 			default:
-				continue // other Mac encodings would need their own decoders
+				continue // rec.String cannot decode other Mac encodings
 			}
 			if rank < bestRank {
 				if s := strings.TrimSpace(rec.String()); s != "" {
